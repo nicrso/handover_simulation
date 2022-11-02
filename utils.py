@@ -23,10 +23,10 @@ handoff_data_dirs = \
     [osp.join(base_dir, 'data2')]*4 + \
     [osp.join(base_dir, 'data3')]*17
 
-def camera_to_world(view_matrix, cam_coords):
+def camera_to_world(view_matrix, cam_pose):
   pose = camera.cam_view2pose(view_matrix)
-  world_coords = cam_coords @ pose[:3,:3].T + pose[:3,3]
-  return world_coords
+  world_pose = pose @ cam_pose 
+  return world_pose
 
 
 def texture_proc(colors, a=0.05, invert=False):
@@ -117,3 +117,4 @@ def show_pointcloud(pts, colors,
   pc.colors = open3d.utility.Vector3dVector(colors)
 
   open3d.visualization.draw_geometries([pc])
+
