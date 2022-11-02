@@ -1,4 +1,4 @@
-# handover_simulation
+# Handover Simulation
 Human-Robot Handover Simulation in iGibson 
 
 #To get started: 
