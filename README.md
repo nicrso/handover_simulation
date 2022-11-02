@@ -6,7 +6,7 @@ Human-Robot Handover Simulation in iGibson
 
 Please also download the assets of iGibson (models of the objects, 3D scenes, etc.) follow the instruction. The data should be located at your_installation_path/igibson/data/.
 
-Make sure to create and activate a conda environment for igibson
+Make sure to create and activate a conda environment for igibson. Use python 3.8
 
 2) Download "data" folder from https://drive.google.com/drive/folders/15MKby1SRh5ywseCOUcV_zXEhz305eHqW?usp=share_link and place in your ./your_installation_path
 
