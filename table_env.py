@@ -25,9 +25,9 @@ class TableEnv:
         table_objects_to_load = {
             "table_1": {
                 "category": "breakfast_table",
-                "model": "5f3f97d6854426cfb41eedea248a6d25",
-                "pos": [1.1, 0.0, 0.4],
-                "orn": [0, 0, 80],
+                "model": "19203",
+                "pos": [1.1, 0.0, 0.2],
+                "orn": [0, 0, 0],
             },
         }
 
@@ -62,12 +62,10 @@ class TableEnv:
             simulator_obj = URDFObject(
                 filename,
                 name=obj_name,
+                scale=np.array([0.3, 0.3, 0.5]),
                 category=category,
                 model_path=model_path,
-                avg_obj_dims=avg_category_spec.get(category),
-                fit_avg_dim_volume=True,
-                texture_randomization=False,
-                overwrite_inertial=True,
+                fixed_base=True
             )
             simulator.import_object(simulator_obj)
             simulator_obj.set_position_orientation(obj["pos"], quat_from_euler(obj["orn"]))
@@ -77,35 +75,21 @@ class TableEnv:
 
             # 3D workspace for table   EDIT 
             self._workspace1_bounds = np.array([
-                [1.0, 1.2],  # 3x2 rows: x,y,z cols: min,max
-                [-0.1, 0.1],
-                [0.5, 1.0]
+                [1.05, 1.15],  # 3x2 rows: x,y,z cols: min,max
+                [-0.05, 0.05],
+                [0.4, 0.45]
             ])
 
         
         # 4 load camera
-        self.camera = camera.Camera(
-            image_size=(128, 128),
+        self.camera = camera.SimCamera(
+            [1.10, 0, 0.8],
+            [1.10, 0, 0.5],
+            [0,1,0],
+            image_size=(512, 512),
             near=0.01,
             far=10.0,
             fov_w=80
-        )
-        # camera_target_position = (self._workspace1_bounds[:, 0] + self._workspace1_bounds[:, 1]) / 2
-        # camera_target_position[2] = 0.4
-        # camera_distance = np.sqrt(((np.array([0.0, 0.0, 1.0]) - camera_target_position)**2).sum()) / 1.7
-        # self.view_matrix = p.computeViewMatrixFromYawPitchRoll(
-        #     cameraTargetPosition=camera_target_position,
-        #     distance=camera_distance,
-        #     yaw=90,
-        #     pitch=-70,
-        #     roll=0,
-        #     upAxisIndex=2,
-        # )
-
-        self.view_matrix = p.computeViewMatrix(
-            cameraEyePosition=[0.8, 0, 0.67],
-            cameraTargetPosition=[1.10, 0, 0.5],
-            cameraUpVector=[0, 0, 1]
         )
     
     def load_objects(self, name_list, type, seed=None):
@@ -155,7 +139,14 @@ class TableEnv:
         for i in range(int(num_steps)):
             p.stepSimulation()
 
-    def observe(self):
-        rgb_obs, depth_obs, mask_obs = camera.make_obs(self.camera, self.view_matrix)
+    def observe(self, revolve=False):
+        
+        if revolve:
+            center = np.average(self._workspace1_bounds, axis=1)
+            center[2] = 0.5
+            img_list = camera.revolving_shot(center=center)
+            return img_list
+        else:
+            rgb_obs, depth_obs, mask_obs = self.camera.get_image()
 
-        return rgb_obs, depth_obs, mask_obs
+            return rgb_obs, depth_obs, mask_obs

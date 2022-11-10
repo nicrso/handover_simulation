@@ -3,6 +3,10 @@ import numpy as np
 import math
 import image
 
+from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
+from igibson.utils.assets_utils import get_scene_path
+
+
 class Camera(object):
     """
     Class to define a camera
@@ -54,6 +58,44 @@ class Camera(object):
         )
 
         return intrinsic_matrix, projection_matrix
+    
+class SimCamera(object):
+    def __init__(self, position, lookat, up_dir=[0,0,1],image_size=(512, 512), near=0.01, far=20.0, fov_w=70.0):
+
+        super().__init__()
+
+        self.camera = Camera(image_size, near, far, fov_w)
+        
+        self.set_pose(position, lookat, up_dir)
+
+
+    def set_pose(self, position, lookat, up=[0,0,1]):
+        self.pos = position
+        self.lookat = lookat
+        self.up_dir = up
+        self.view_matrix = p.computeViewMatrix(
+            self.pos, self.lookat, self.up_dir)
+        self.pose_matrix = np.linalg.inv(
+            np.array(self.view_matrix).reshape(4, 4).T)
+        self.pose_matrix[:, 1:3] = -self.pose_matrix[:, 1:3]
+    
+    def get_image(self):
+        return make_obs(self.camera, self.view_matrix)
+
+def revolving_shot(center=[0, 0, 0], count=60, radius=0.4):
+
+    center = np.array(center)
+    images = []
+
+    camera = SimCamera(position=center + np.array([0, 0.4, 0]), lookat=center)
+    for i in range(count):
+        position = center + np.array([
+            np.sin(i * 2 * np.pi / count) * radius,
+            np.cos(i * 2 * np.pi / count) * radius,
+            0])
+        camera.set_pose(position, center)
+        images.append(camera.get_image()[0])
+    return images
 
 
 def cam_view2pose(cam_view_matrix):
@@ -141,3 +183,4 @@ def save_obs(dataset_dir, camera, num_obs, sceneID):
         # Save view matrix for test case
         # view_matrix_name = dataset_dir + "view_matrix/" + str(i+sceneID*num_obs)
         # np.save(view_matrix_name, view_matrix)
+
