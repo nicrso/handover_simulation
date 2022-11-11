@@ -30,21 +30,41 @@ def visualize_path(q_1, q_2, env, color=[0, 1, 0]):
     # draw line between points
     p.addUserDebugLine(point_1, point_2, color, 1.0)
 
+def move_robot_base(robot, robot_id, dest=(0,0), n_steps=10000):
 
-def accurate_calculate_inverse_kinematics(robot_id, fetch, eef_link_id, target_pos, threshold, max_iter, min_limits, max_limits, joint_range, rest_position, joint_damping, arm_joint_ids, robot_arm_indices):
+    pos, quat = p.getBasePositionAndOrientation(robot_id)
+    pos = np.array(pos)
+    for i in range(n_steps):
+        x = i/(n_steps/dest[0]) if dest[0] != 0 else 0.0
+        y = i/(n_steps/dest[1]) if dest[1] != 0 else 0.0
+        robot.set_position_orientation([x, y, 0.0]+pos, quat)
+
+def rotate_robot_base(robot, robot_id, rot=3.14, n_steps=10000):
+
+    pos, quat_prev = p.getBasePositionAndOrientation(robot_id)
+    quat_prev = np.array(p.getEulerFromQuaternion(quat_prev))
+    for i in range(n_steps):
+        quat = np.array(p.getQuaternionFromEuler([0, 0, i/(n_steps/rot)+quat_prev[2]]))
+        robot.set_position_orientation(pos, quat)
+
+    return 
+
+def accurate_calculate_inverse_kinematics(robot_id, fetch, eef_link_id, curr_pos, target_pos, threshold, max_iter, min_limits, max_limits, joint_range, rest_position, joint_damping, arm_joint_ids, robot_arm_indices):
     print("IK solution to end effector position {}".format(target_pos))
     # Save initial robot pose
     state_id = p.saveState()
 
-    max_attempts = 5
+    max_attempts = 100
     solution_found = False
-    joint_poses = None
+    joint_poses_list = []
     for attempt in range(1, max_attempts + 1):
         print("Attempt {} of {}".format(attempt, max_attempts))
+
         # Get a random robot pose to start the IK solver iterative process
         # We attempt from max_attempt different initial random poses
         sample_fn = get_sample_fn(robot_id, arm_joint_ids)
         sample = np.array(sample_fn())
+
         # Set the pose of the robot there
         set_joint_positions(robot_id, arm_joint_ids, sample)
 
@@ -69,20 +89,27 @@ def accurate_calculate_inverse_kinematics(robot_id, fetch, eef_link_id, target_p
             dist = l2_distance(fetch.get_eef_position(), target_pos)
             if dist < threshold:
                 solution_found = True
+                joint_poses_list.append(joint_poses)
                 break
             logging.debug("Dist: " + str(dist))
             it += 1
 
         if solution_found:
             print("Solution found at iter: " + str(it) + ", residual: " + str(dist))
-            break
+            continue
         else:
             print("Attempt failed. Retry")
             joint_poses = None
 
+    #manually rank the the samples based on the L2 distance that is closest to the rest pose.
+
     p.restoreState(state_id)
-    # p.removeState(state_id)
-    return joint_poses
+
+    #return closest pose based on l2 distance 
+    joint_poses_list = sorted(joint_poses_list, key=lambda x: l2_distance(curr_pos, x))
+
+    print(len(joint_poses_list))
+    return joint_poses_list[0]
 
 def rrt(q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, env):
     """
@@ -311,4 +338,6 @@ def get_movej_trajectory(j_start, j_end, acceleration, speed, dt=0.001):
     assert(np.allclose(j_traj[0], j_start))
     assert(np.allclose(j_traj[-1], j_end))
     return j_traj
+
+
 
