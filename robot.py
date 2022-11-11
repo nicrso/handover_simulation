@@ -13,7 +13,7 @@ from igibson.external.pybullet_tools.utils import (
     joints_from_names,
     set_joint_positions,
 )
-from control import accurate_calculate_inverse_kinematics
+from control import accurate_calculate_inverse_kinematics, move_robot_base, rotate_robot_base
 
 class fetch_wrapper():
     def __init__(self, s):
@@ -30,7 +30,7 @@ class fetch_wrapper():
         s.import_object(self.fetch)
 
         self.arm_default_joint_positions = (
-            0.10322468280792236,
+            # 0.10322468280792236,
             -11.814019864768982,
             11.5178184935241699,
             10.8189625336474915,
@@ -38,6 +38,17 @@ class fetch_wrapper():
             10.9631312579803466,
             -10.2862852996643066,
             10.0008453550418615341,
+        )
+
+        self.arm_untucked_joint_positions = (
+            # 0.0,
+            1.0,
+            -0.1,
+            1.5,
+            -1.5,
+            1.0,
+            -1.2,
+            0.0,
         )
 
         self.robot_default_joint_positions = (
@@ -65,7 +76,7 @@ class fetch_wrapper():
             "l_gripper_finger_joint",
         ]
         self.arm_joints_names = [
-            "torso_lift_joint",
+            # "torso_lift_joint",
             "shoulder_pan_joint",
             "shoulder_lift_joint",
             "upperarm_roll_joint",
@@ -224,6 +235,43 @@ class fetch_wrapper():
 
         s.disconnect()
 
+    def move_across_table(self, forward=True):
+
+        if forward:
+            rotate_robot_base(self.fetch, self.robot_id, rot=1.57)
+
+            move_robot_base(self.fetch, self.robot_id, dest=(0,0.6))
+
+            rotate_robot_base(self.fetch, self.robot_id, rot=-1.57)
+
+            move_robot_base(self.fetch, self.robot_id, dest=(1.2,0))
+
+            rotate_robot_base(self.fetch, self.robot_id, rot=-1.57)
+
+            move_robot_base(self.fetch, self.robot_id, dest=(0,-0.6))
+
+            rotate_robot_base(self.fetch, self.robot_id, rot=-1.57)
+
+            self.fetch.keep_still()
+
+        else:
+            rotate_robot_base(self.fetch, self.robot_id, rot=-1.57)
+
+            move_robot_base(self.fetch, self.robot_id, dest=(0,0.6))
+
+            rotate_robot_base(self.fetch, self.robot_id, rot=1.57)
+
+            move_robot_base(self.fetch, self.robot_id, dest=(-1.2,0))
+
+            rotate_robot_base(self.fetch, self.robot_id, rot=1.57)
+
+            move_robot_base(self.fetch, self.robot_id, dest=(0,-0.6))
+
+            rotate_robot_base(self.fetch, self.robot_id, rot=1.57)
+
+            self.fetch.keep_still()
+
+            
 
     def print_message(self):
         print("*" * 80)
