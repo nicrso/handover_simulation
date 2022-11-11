@@ -6,7 +6,7 @@ import time
 from unicodedata import category
 import robot
 from utils import load_from_pkl, degenerate_masks, camera_to_world
-from control import accurate_calculate_inverse_kinematics
+from control import accurate_calculate_inverse_kinematics, move_robot_base, rotate_robot_base
 
 import numpy as np
 import pybullet as p
@@ -117,19 +117,6 @@ def main(selection="user", headless=False, short_exec=False):
 
         env.load_objects([name], args.type)
 
-        #move robot to the table
-        action = np.zeros(fetch.action_dim)
-        action[0] = 1
-
-        
-
-        #move to position 0.8
-        #n_steps'
-        des_x = 0.5
-        n_steps = 10000
-        for i in range(n_steps):
-            fetch.set_position_orientation([i/(n_steps/des_x), 0.0, 0.0], [0, 0, 0, 1])
-
         #get RGB-D data
         rgb_obs, depth_obs, mask_obs = env.observe()
 
@@ -147,8 +134,8 @@ def main(selection="user", headless=False, short_exec=False):
         # geom, preds = load_from_pkl(d)            
         # geom = geom[0]
 
-        #move robot to table 
-
+        #move to table
+        move_robot_base(fetch, fetch_wrapper.robot_id, dest=(0.5, 0))
         
         #show human grasps 
         #ignore degenerate grasps
@@ -157,12 +144,15 @@ def main(selection="user", headless=False, short_exec=False):
         #visualize predictions for the objects
 
         #save scene to numpy array
-        # save_dict = {'depth': depth_obs, 'K': env.camera.intrinsic_matrix, 'segmap': mask_obs,'rgb': rgb_obs}
-        # np.save('table_'+name+'.npy', save_dict)
-
+        save_dict = {'depth': depth_obs, 'K': env.camera.camera.intrinsic_matrix, 'segmap': mask_obs,'rgb': rgb_obs}
+        np.save('table_'+name+'.npy', save_dict)
 
         #predict robot grasp 
         #get pick pose from coord, angle, vis_img
+
+
+        #set robot arm to hover mode
+        set_joint_positions(fetch_wrapper.robot_id, fetch_wrapper.arm_joint_ids, fetch_wrapper.arm_untucked_joint_positions)
         
         robo_grasps_data = np.load("./data/robot_grasp_predictions/predictions_table_" + name + ".npz", allow_pickle=True)
         
@@ -180,14 +170,14 @@ def main(selection="user", headless=False, short_exec=False):
 
         marker.set_position([1.1, 0, 0.5])
 
-        # joint_pos = accurate_calculate_inverse_kinematics(
-        #     fetch_wrapper.robot_id, fetch, fetch.eef_links[fetch.default_arm].link_id, [1.1, 0, 0.5], 0.1, 100,
-        #     fetch_wrapper.min_limits, fetch_wrapper.max_limits, fetch_wrapper.joint_range, fetch_wrapper.rest_position, fetch_wrapper.joint_damping, fetch_wrapper.arm_joint_ids, 
-        #     fetch_wrapper.robot_arm_indices
-        # )
+        joint_pos = accurate_calculate_inverse_kinematics(
+            fetch_wrapper.robot_id, fetch, fetch.eef_links[fetch.default_arm].link_id, fetch_wrapper.arm_untucked_joint_positions, [1.1, 0, 0.5], 0.1, 100,
+            fetch_wrapper.min_limits, fetch_wrapper.max_limits, fetch_wrapper.joint_range, fetch_wrapper.rest_position, fetch_wrapper.joint_damping, fetch_wrapper.arm_joint_ids, 
+            fetch_wrapper.robot_arm_indices
+        )
 
-        # if joint_pos is not None and len(joint_pos) > 0:
-        #     fetch_wrapper.move_joints(s, joint_pos)
+        if joint_pos is not None and len(joint_pos) > 0:
+            fetch_wrapper.move_joints(s, joint_pos)
             # set_joint_positions(fetch_wrapper.robot_id, fetch_wrapper.arm_joint_ids, joint_pos)
 
         for _ in range(100):
@@ -197,28 +187,44 @@ def main(selection="user", headless=False, short_exec=False):
         # fetch_wrapper.move_joints_to_tuck(s)
         fetch.tuck()
 
-        # #move to human 
-        n_steps = 10000
-        for i in range(n_steps):
-            fetch.set_position_orientation([0.5-(i/(n_steps/des_x)), 0.0, 0.0], [0, 0, 0, 1])
+        # fetch_wrapper.move_across_table()
+        # fetch_wrapper.move_across_table(forward=False)
+        # #turn robot around 
+        rotate_robot_base(fetch, fetch_wrapper.robot_id, rot=-3.14)
+
         fetch.keep_still()
 
-    # visualize human model view
-    viewMatrix = p.computeViewMatrix(
-        cameraEyePosition=[-1.3, 0, 1.8],
-        cameraTargetPosition=[0.5,0,1.0],
-        cameraUpVector=[0, 0, 1]
-    )
+        move_robot_base(fetch, fetch_wrapper.robot_id, dest=(-1.0,0))
 
-    human_camera = camera.Camera(
-        image_size=(128,128),
-        near=0.01,
-        far=20.0,
-        fov_w=90
-    )
+        # visualize human model view
+        viewMatrix = p.computeViewMatrix(
+            cameraEyePosition=[-1.3, 0, 1.8],
+            cameraTargetPosition=[0.5,0,1.0],
+            cameraUpVector=[0, 0, 1]
+        )
 
-    rgb_obs, _, _ = camera.make_obs(human_camera, viewMatrix)  
-    write_rgb(rgb_obs, "person_view.jpg")
+        human_camera = camera.Camera(
+            image_size=(128,128),
+            near=0.01,
+            far=20.0,
+            fov_w=90
+        )
+
+        rgb_obs, _, _ = camera.make_obs(human_camera, viewMatrix)  
+        write_rgb(rgb_obs, name+"person_view.jpg")
+
+
+        rotate_robot_base(fetch, fetch_wrapper.robot_id)
+
+        for _ in range(100):
+            s.step()
+
+        move_robot_base(fetch, fetch_wrapper.robot_id, dest=(0.5,0))
+
+        for _ in range(100):
+            s.step()
+
+        fetch.keep_still()
 
     fetch_wrapper.teleop(s)
 
